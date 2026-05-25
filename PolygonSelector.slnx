@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Authentication.md" />
+    <File Path="DefinitionOfProject.md" />
+    <File Path="PlanDevelopment.md" />
+  </Folder>
+  <Project Path="BlazorMapClient/BlazorMapClient.csproj" />
+  <Project Path="TestClientForPolygonSelector/TestClientForPolygonSelector.csproj" />
+  <Project Path="WebServerPolygonSelector/WebServerPolygonSelector.csproj" />
+</Solution>

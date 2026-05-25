@@ -1,0 +1,86 @@
+@page "/"
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IDisposable
+
+<!-- ── Left pane: Map ── -->
+<div class="map-pane">
+    <div class="map-toolbar">
+        <span>🗺 Polygon Selector</span>
+        <span style="color:#888;font-size:11px;">Draw a polygon on the map to search</span>
+        <button @onclick="ClearAll">Clear</button>
+    </div>
+    <div id="map-container"></div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ── Right pane: Log ── -->
+<div class="log-pane">
+    <div class="log-header">
+        <span>📋 Results Log</span>
+        <button @onclick="ClearLog">Clear log</button>
+    </div>
+    <div class="log-output" @ref="_logRef">
+        @foreach (var entry in _logEntries)
+        {
+            <p class="log-line @entry.CssClass">@entry.Text</p>
+        }
+    </div>
+</div>
+
+@code {
+    private DotNetObjectReference<Map>? _dotNetRef;
+    private ElementReference _logRef;
+    private readonly List<LogEntry> _logEntries = [];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("MapApp.init", "map-container", _dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnLogMessage(string message)
+    {
+        _logEntries.Add(new LogEntry(message));
+        StateHasChanged();
+        // Scroll log to bottom
+        await JS.InvokeVoidAsync("eval",
+            "var el = document.querySelector('.log-output'); if(el) el.scrollTop = el.scrollHeight;");
+    }
+
+    private async Task ClearAll()
+    {
+        _logEntries.Clear();
+        await JS.InvokeVoidAsync("MapApp.clearResults");
+        StateHasChanged();
+    }
+
+    private void ClearLog()
+    {
+        _logEntries.Clear();
+        StateHasChanged();
+    }
+
+    public void Dispose() => _dotNetRef?.Dispose();
+
+    private record LogEntry
+    {
+        public string Text { get; }
+        public string CssClass { get; }
+
+        public LogEntry(string msg)
+        {
+            Text = msg;
+            CssClass = msg.StartsWith("ERROR")       ? "error"
+                     : msg.StartsWith("Search compl") ? "done"
+                     : msg.StartsWith("  ")           ? "props"
+                     : msg.StartsWith("[")            ? "result"
+                     : "info";
+        }
+    }
+}
