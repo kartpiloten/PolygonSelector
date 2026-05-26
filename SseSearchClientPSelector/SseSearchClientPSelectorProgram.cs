@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Headers;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -32,7 +32,7 @@ var request = new HttpRequestMessage(HttpMethod.Post, serverUrl)
     Content = new StringContent(requestBody, Encoding.UTF8, "application/json")
 };
 
-Console.WriteLine("Sending polygon search request...\n");
+Console.WriteLine("Sending polygon search request (SSE)...\n");
 
 using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
 

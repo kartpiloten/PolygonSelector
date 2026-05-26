@@ -40,7 +40,7 @@ public static class SearchEndpoint
             }
 
             // Parse the input GeoJSON polygon
-            // Coordinates must be in SWEREF 99 TM (EPSG:3006)
+            // Coordinates are interpreted using the SRID specified in the request (defaults to 4326)
             Geometry polygon;
             try
             {
@@ -58,6 +58,8 @@ public static class SearchEndpoint
                 return;
             }
 
+            // Response is streamed as Server-Sent Events (SSE).
+            // All returned GeoJSON geometries are in SRID 4326 (WGS 84), as required by RFC 7946.
             // Set SSE response headers
             ctx.Response.Headers.ContentType = "text/event-stream";
             ctx.Response.Headers.CacheControl = "no-cache";

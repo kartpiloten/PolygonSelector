@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using MapPiloteGeopackageHelper;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
 using Npgsql;
@@ -76,6 +77,81 @@ public class GeoSearchService(IConfiguration config, ILogger<GeoSearchService> l
             });
 
             yield return (table.Title, featureCollection);
+        }
+    }
+
+    /// <summary>
+    /// Searches each configured table and yields results as FeatureRecords
+    /// with geometries transformed to <paramref name="outputSrid"/>.
+    /// Intended for GeoPackage export.
+    /// </summary>
+    public async IAsyncEnumerable<(string LayerName, string GeometryType, List<FeatureRecord> Features)> SearchForGeoPackageAsync(
+        Geometry polygon,
+        int outputSrid,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var wktWriter = new WKTWriter { OutputOrdinates = Ordinates.XY };
+        var wkt = wktWriter.Write(polygon);
+        int inputSrid = polygon.SRID == 0 ? 4326 : polygon.SRID;
+        var wkbReader = new WKBReader();
+
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync(ct);
+
+        foreach (var table in _tables)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var attrCols = string.Join(", ", table.AttributeColumns.Select(c => $"\"{c}\""));
+            var sql = $"""
+                SELECT ST_AsEWKB(ST_Transform("{table.GeometryColumn}", {outputSrid})) AS geom_wkb,
+                       ST_GeometryType("{table.GeometryColumn}") AS geom_type,
+                       {attrCols}
+                FROM {table.TableName}
+                WHERE ST_Intersects(
+                    "{table.GeometryColumn}",
+                    ST_Transform(ST_GeomFromText('{wkt}', {inputSrid}),
+                                 ST_SRID("{table.GeometryColumn}"))
+                )
+                """;
+
+            var features = new List<FeatureRecord>();
+            string geometryType = "GEOMETRY";
+            try
+            {
+                await using var cmd = new NpgsqlCommand(sql, conn);
+                await using var reader = await cmd.ExecuteReaderAsync(ct);
+
+                while (await reader.ReadAsync(ct))
+                {
+                    if (reader.IsDBNull(0))
+                        continue;
+
+                    var wkbBytes = (byte[])reader.GetValue(0);
+                    var geom = wkbReader.Read(wkbBytes);
+                    geom.SRID = outputSrid;
+
+                    // Capture geometry type from first row (e.g. "ST_Polygon" -> "POLYGON")
+                    if (features.Count == 0 && !reader.IsDBNull(1))
+                        geometryType = reader.GetString(1).Replace("ST_", "").ToUpperInvariant();
+
+                    var attrs = new Dictionary<string, string>();
+                    for (int i = 0; i < table.AttributeColumns.Count; i++)
+                    {
+                        attrs[table.AttributeColumns[i]] = reader.IsDBNull(i + 2)
+                            ? string.Empty
+                            : reader.GetValue(i + 2)?.ToString() ?? string.Empty;
+                    }
+
+                    features.Add(new FeatureRecord(geom, attrs));
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error querying table {Table} for GeoPackage export", table.TableName);
+            }
+
+            yield return (table.Title, geometryType, features);
         }
     }
 }

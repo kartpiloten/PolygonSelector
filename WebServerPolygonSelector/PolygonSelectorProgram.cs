@@ -17,5 +17,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("BlazorClient");
 app.MapSearchEndpoint();
+app.MapGeoPackageEndpoint();
 
 app.Run();

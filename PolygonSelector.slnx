@@ -5,6 +5,7 @@
     <File Path="PlanDevelopment.md" />
   </Folder>
   <Project Path="BlazorMapClient/BlazorMapClient.csproj" />
-  <Project Path="TestClientForPolygonSelector/TestClientForPolygonSelector.csproj" />
+  <Project Path="SseSearchClientPSelector/SseSearchClientPSelector.csproj" />
+  <Project Path="GeoPackageClientPSelector/GeoPackageClientPSelector.csproj" />
   <Project Path="WebServerPolygonSelector/WebServerPolygonSelector.csproj" />
 </Solution>
